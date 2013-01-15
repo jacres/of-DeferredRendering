@@ -8,4 +8,6 @@ A GBuffer class and shaders show how to generate a GBuffer containing view-space
 
 The SSAO implemented in this example uses the basic method outlined in this great article by Nathaniel Meyer: http://devmaster.net/posts/3095/shader-effects-screen-space-ambient-occlusion.
 
+<img src="http://farm9.staticflickr.com/8223/8253081005_2e6493be39_z_d.jpg" />
 <img src="http://farm9.staticflickr.com/8367/8385201806_a60b986ff0_b_d.jpg" />
+<img src="http://farm9.staticflickr.com/8190/8384116631_58567c7ffd_z_d.jpg" />
