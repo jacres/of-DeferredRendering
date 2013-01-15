@@ -14,9 +14,8 @@ The SSAO implemented in this example uses the basic method outlined in this grea
 Very much WIP - a few things left to do:
 - implement light volumes to cut down on the number of fragments processed
 - extract view-space position from depth and remove view-space position from GBuffer
-- material indexing in storing lookup values for material properties in a 3D texture (this presents a bit of a challenge in OF as it won't work with the way things are currently rendered)
+- material indexing / storing lookup values for material properties in a 3D texture (this presents a bit of a challenge in OF as it won't work with the way things are currently rendered)
 - fix a bug where about 120px are being cropped from top of FBO textures on my MBP's Nvidia 330m card. Fixed this in another project awhile back, but forget what I did! I'll have to look it up - if anyone know the answer in the meantime, please hit me up ;)
-
 
 Screenshots from http://www.flickr.com/photos/85184046@N07/
 
