@@ -5,7 +5,7 @@
 //  http://github.com/jacres
 //  @jimmyacres
 
-#include "gbuffer.h"
+#include "gBuffer.h"
 
 ofVbo GBuffer::s_quadVbo;
 
@@ -119,7 +119,7 @@ void GBuffer::setupFbo() {
   
   if (status != GL_FRAMEBUFFER_COMPLETE) {
     cout << "GBuffer::init() - error could not create framebuffer" << endl;
-    return false;
+    return;
   }
   
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
