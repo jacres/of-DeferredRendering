@@ -85,7 +85,7 @@ GLuint SSAOPass::getTextureReference() {
   return m_ssaoTex;
 }
 
-void SSAOPass::applySSAO(GLuint positionTex, GLuint normalTex, GLuint depthTex) {
+void SSAOPass::applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint depthTexUnit) {
   glDisable(GL_DEPTH_TEST);
   glDepthMask(GL_FALSE);
   
@@ -103,9 +103,9 @@ void SSAOPass::applySSAO(GLuint positionTex, GLuint normalTex, GLuint depthTex) 
   m_ssaoShader.begin();
   
   m_ssaoShader.setUniform1i("u_randomJitterTex", 10);
-  m_ssaoShader.setUniform1i("u_viewSpacePositionTex", positionTex);
-  m_ssaoShader.setUniform1i("u_normalTex", normalTex);
-  m_ssaoShader.setUniform1i("u_linearDepthTex", depthTex);
+  m_ssaoShader.setUniform1i("u_viewSpacePositionTex", positionTexUnit);
+  m_ssaoShader.setUniform1i("u_normalTex", normalTexUnit);
+  m_ssaoShader.setUniform1i("u_linearDepthTex", depthTexUnit);
   
   m_ssaoShader.setUniform1f("u_texelWidth", m_texel_w);
   m_ssaoShader.setUniform1f("u_texelHeight", m_texel_h);

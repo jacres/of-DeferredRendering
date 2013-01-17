@@ -11,7 +11,7 @@ public:
   ~SSAOPass();
 
   void setup(int w, int h, int numSamples=12);
-  void applySSAO(GLuint positionTex, GLuint normalTex, GLuint depthTex);
+  void applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint depthTexUnit);
   void drawDebug(int x, int y);
   
   GLuint getTextureReference();
