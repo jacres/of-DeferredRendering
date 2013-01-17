@@ -125,7 +125,7 @@ void testApp::bindGBufferTextures() {
   
   glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_DEPTH]);
   glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH));
-  
+
   // bind SSAO texture
   glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_SSAO]);
   glBindTexture(GL_TEXTURE_2D, m_ssaoPass.getTextureReference());
@@ -133,7 +133,6 @@ void testApp::bindGBufferTextures() {
   m_shader.setUniform1i("u_albedoTex", m_textureUnits[TEX_UNIT_ALBEDO]);
   m_shader.setUniform1i("u_positionTex", m_textureUnits[TEX_UNIT_POSITION]);
   m_shader.setUniform1i("u_normalTex", m_textureUnits[TEX_UNIT_NORMAL]);
-  m_shader.setUniform1i("u_linearDepthTex", m_textureUnits[TEX_UNIT_DEPTH]);
   m_shader.setUniform1i("u_ssaoTex", m_textureUnits[TEX_UNIT_SSAO]);
 
   m_shader.end();
@@ -172,7 +171,7 @@ void testApp::draw() {
   
   glEnable( GL_DEPTH_TEST );
 
-  glDisable(GL_CULL_FACE); // cull backfaces
+  glEnable(GL_CULL_FACE); // cull backfaces
   glCullFace(GL_BACK);
   
   glColor4f(1.0, 1.0, 1.0, 1.0);
@@ -261,7 +260,7 @@ void testApp::draw() {
   
   if (m_bDrawDebug) {
     m_gBuffer.drawDebug(0, 0);
-    m_ssaoPass.drawDebug(0, ofGetWindowHeight()/4);
+    m_ssaoPass.drawDebug(ofGetWindowWidth()/4 * 3, 0);
   }
   
   ofSetColor(255, 255, 255, 255);

@@ -70,13 +70,13 @@ bool GBuffer::setupFbo() {
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, m_buffer_w, m_buffer_h, 0, GL_RGB, GL_FLOAT, NULL);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_NORMAL], 0);
   
-  // linear depth (16-bit RGB float for accuracy)
+  // linear depth (24-bit RGB float for accuracy)
   glBindTexture(GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH]);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, m_buffer_w, m_buffer_h, 0, GL_RGB, GL_FLOAT, NULL);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m_buffer_w, m_buffer_h, 0, GL_LUMINANCE, GL_FLOAT, NULL);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH], 0);
 
   // create depth texture (we don't use this explicitly, but since we use depth testing when rendering, our FBO needs a depth buffer)

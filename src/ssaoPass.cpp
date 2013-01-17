@@ -89,6 +89,8 @@ void SSAOPass::applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint de
   glDisable(GL_DEPTH_TEST);
   glDepthMask(GL_FALSE);
   
+  glEnable(GL_BLEND);
+  
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo);
   GLuint drawBuffers[] = {GL_COLOR_ATTACHMENT0};
   glDrawBuffers(1, drawBuffers);
