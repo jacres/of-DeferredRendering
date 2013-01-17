@@ -14,7 +14,7 @@ m_bDrawDebug(true)
 
 //--------------------------------------------------------------
 void testApp::setup() {
-  ofSetVerticalSync(false);
+//  ofSetVerticalSync(false); // can cause problems on some Linux implementations
   ofDisableArbTex();
   ofSetSphereResolution(6);
   
