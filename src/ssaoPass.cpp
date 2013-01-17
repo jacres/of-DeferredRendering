@@ -36,7 +36,7 @@ SSAOPass::~SSAOPass() {
 
 void SSAOPass::setup(int w, int h, int numSamples) {
   m_fbo_w = w;
-  m_fbo_w = h;
+  m_fbo_h = h;
   
   m_texel_w = 1.0f/(float)m_fbo_w;
   m_texel_h = 1.0f/(float)m_fbo_h;
@@ -53,45 +53,59 @@ void SSAOPass::setup(int w, int h, int numSamples) {
   m_randomTexture.loadImage("textures/random.png");
 
   // setup fbo
-  ofFbo::Settings s;
-  s.width = w;
-  s.height = h;
-  s.internalformat = GL_RGBA;
-  s.numColorbuffers = 1;
-  s.textureTarget = GL_TEXTURE_2D;
-  s.useDepth = false;
-  s.useStencil = false;
-  s.depthStencilAsTexture = false;
+  // create all gbuffer textures
+  glGenTextures(1, &m_ssaoTex);
   
-  m_fbo.allocate(s);
+  // 8-bit RGB texture for SSAO
+  glBindTexture(GL_TEXTURE_2D, m_ssaoTex);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_fbo_w, m_fbo_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+  
+  // create an fbo
+  glGenFramebuffers(1, &m_fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_ssaoTex, 0);
+
+  // check status
+  GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  
+  if (status != GL_FRAMEBUFFER_COMPLETE) {
+    cout << "ssaoPass::setup() - error could not create framebuffer" << endl;
+    return false;
+  }
+  
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-ofTexture& SSAOPass::getTextureReference() {
-  return m_fbo.getTextureReference();
-}
-
-void SSAOPass::applySSAO(ofTexture& positionTex, ofTexture& normalTex, ofTexture& depthTex) {
-  applySSAO(positionTex.texData.textureID, normalTex.texData.textureID, depthTex.texData.textureID);
+GLuint SSAOPass::getTextureReference() {
+  return m_ssaoTex;
 }
 
 void SSAOPass::applySSAO(GLuint positionTex, GLuint normalTex, GLuint depthTex) {
-  m_fbo.begin();
+  glDisable(GL_DEPTH_TEST);
+  glDepthMask(GL_FALSE);
+  
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo);
+  GLuint drawBuffers[] = {GL_COLOR_ATTACHMENT0};
+  glDrawBuffers(1, drawBuffers);
   
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
   glDisable(GL_BLEND);
-
-  glActiveTexture(GL_TEXTURE0); m_randomTexture.getTextureReference().bind();
-  glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, positionTex);
-  glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, normalTex);
-  glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, depthTex);
+  
+  glActiveTexture(GL_TEXTURE10);
+  glBindTexture(GL_TEXTURE_2D, m_randomTexture.getTextureReference().getTextureData().textureID);
   
   m_ssaoShader.begin();
   
-  m_ssaoShader.setUniform1i("u_randomJitterTex", 0);
-  m_ssaoShader.setUniform1i("u_viewSpacePositionTex", 1);
-  m_ssaoShader.setUniform1i("u_normalTex", 2);
-  m_ssaoShader.setUniform1i("u_linearDepthTex", 3);
+  m_ssaoShader.setUniform1i("u_randomJitterTex", 10);
+  m_ssaoShader.setUniform1i("u_viewSpacePositionTex", positionTex);
+  m_ssaoShader.setUniform1i("u_normalTex", normalTex);
+  m_ssaoShader.setUniform1i("u_linearDepthTex", depthTex);
   
   m_ssaoShader.setUniform1f("u_texelWidth", m_texel_w);
   m_ssaoShader.setUniform1f("u_texelHeight", m_texel_h);
@@ -103,13 +117,15 @@ void SSAOPass::applySSAO(GLuint positionTex, GLuint normalTex, GLuint depthTex) 
   drawScreenQuad();
 
   m_ssaoShader.end();
- 
-  glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
   
-  m_fbo.end();
+  glActiveTexture(GL_TEXTURE10); glBindTexture(GL_TEXTURE_2D, 0); // unbind jitter texture
+  glActiveTexture(GL_TEXTURE0); // restore active texture to texture0 (OF expects this)
+ 
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+  glDrawBuffer(GL_BACK);
+  
+  glEnable(GL_DEPTH_TEST);
+  glDepthMask(GL_TRUE);
 }
 
 void SSAOPass::drawScreenQuad() {
@@ -130,9 +146,17 @@ void SSAOPass::drawScreenQuad() {
   glPopMatrix();
 }
 
-void SSAOPass::drawDebug(int x, int y, int w, int h) {
-  ofPushMatrix();
-  ofScale(1.0, -1.0, 1.0);
-  m_fbo.draw(x, -y-h, w, h);
-  ofPopMatrix();
+void SSAOPass::drawDebug(int x, int y) {
+  // draw buffers at 1/4 size
+  int quarterW = m_fbo_w/4;
+  int quarterH = m_fbo_h/4;
+  
+  int wy = ofGetWindowHeight() - y - quarterH;
+  
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo);
+  
+  glReadBuffer(GL_COLOR_ATTACHMENT0);
+  glBlitFramebuffer(0, 0, m_fbo_w, m_fbo_h, 0+x, 0+wy, quarterW+x, quarterH+wy, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 }

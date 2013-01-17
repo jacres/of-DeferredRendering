@@ -40,21 +40,17 @@ public:
   GLuint getTexture(GBUFFER_TEXTURE_TYPE textureType);
   
 private:
-  static const ofVec2f  s_quadVerts[];
-  static const ofVec2f  s_quadTexCoords[];
-  static ofVbo          s_quadVbo;
-
   ofShader m_gBufferShader;
   
-  int    m_fbo_w;
-  int    m_fbo_h;
-  
+  int    m_buffer_w;
+  int    m_buffer_h;
+
   GLuint m_fbo;
   GLuint m_textures[GBUFFER_NUM_TEXTURES];
   GLenum m_drawBuffers[GBUFFER_NUM_TEXTURES];
 
   void loadShaders();
-  void setupFbo();
+  bool setupFbo();
 };
 
 #endif /* defined(__app__gbuffer__) */

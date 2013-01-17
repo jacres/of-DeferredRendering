@@ -19,8 +19,8 @@ void testApp::setup() {
   ofSetSphereResolution(6);
   
   // set up our gbuffer and ssao pass
-  m_gBuffer.setup(1024, 1024);
-  m_ssaoPass.setup(1024, 1024, 12);
+  m_gBuffer.setup(ofGetWindowWidth(), ofGetWindowHeight());
+  m_ssaoPass.setup(ofGetWindowWidth(), ofGetWindowHeight(), 12);
 
   setupScreenQuad();
 
@@ -35,6 +35,8 @@ void testApp::setup() {
   
   setupLights();
   createRandomBoxes();
+  
+  bindGBufferTextures(); // bind them once to upper texture units - faster than binding/unbinding every frame
 }
 
 void testApp::setupScreenQuad() {
@@ -100,13 +102,61 @@ void testApp::addRandomLight() {
   m_lights.push_back(l);
 }
 
+void testApp::bindGBufferTextures() {
+  // set up the texture units we want to use - we're using them every frame, so we'll leave them bound to these units to save speed vs. binding/unbinding
+  m_textureUnits[TEX_UNIT_ALBEDO] = 11;
+  m_textureUnits[TEX_UNIT_POSITION] = 12;
+  m_textureUnits[TEX_UNIT_NORMAL] = 13;
+  m_textureUnits[TEX_UNIT_DEPTH] = 14;
+  m_textureUnits[TEX_UNIT_SSAO] = 15;
+  
+  
+  m_shader.begin();  // our final deferred scene shader
+  
+  // bind all GBuffer textures
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_ALBEDO]);
+  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_DIFFUSE));
+  
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_POSITION]);
+  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_POSITION));
+  
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_NORMAL]);
+  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_NORMAL));
+  
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_DEPTH]);
+  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH));
+  
+  // bind SSAO texture
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_SSAO]);
+  glBindTexture(GL_TEXTURE_2D, m_ssaoPass.getTextureReference());
+  
+  m_shader.setUniform1i("u_albedoTex", m_textureUnits[TEX_UNIT_ALBEDO]);
+  m_shader.setUniform1i("u_positionTex", m_textureUnits[TEX_UNIT_POSITION]);
+  m_shader.setUniform1i("u_normalTex", m_textureUnits[TEX_UNIT_NORMAL]);
+  m_shader.setUniform1i("u_linearDepthTex", m_textureUnits[TEX_UNIT_DEPTH]);
+  m_shader.setUniform1i("u_ssaoTex", m_textureUnits[TEX_UNIT_SSAO]);
+
+  m_shader.end();
+  
+  glActiveTexture(GL_TEXTURE0);
+}
+
+void testApp::unbindGBufferTextures() {
+  // unbind textures and reset active texture back to zero (OF expects it at 0 - things like ofDrawBitmapString() will break otherwise)
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_ALBEDO]); glBindTexture(GL_TEXTURE_2D, 0);
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_POSITION]); glBindTexture(GL_TEXTURE_2D, 0);
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_NORMAL]); glBindTexture(GL_TEXTURE_2D, 0);
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_DEPTH]); glBindTexture(GL_TEXTURE_2D, 0);
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_SSAO]); glBindTexture(GL_TEXTURE_2D, 0);
+  
+  glActiveTexture(GL_TEXTURE0);
+}
+
 //--------------------------------------------------------------
 void testApp::update() {
-  ofSetWindowTitle( ofToString( ofGetFrameRate() ) );
-  
   m_angle += 1.0f;
   
-  float count = 0.0f;
+  int count = 0;
   
   // orbit our lights around (0, 0, 0) in a random orbit direction that was assigned when
   // we created them
@@ -122,47 +172,56 @@ void testApp::draw() {
   
   glEnable( GL_DEPTH_TEST );
 
-  // start our GBuffer for writing (pass in near and far so that we can create linear depth values in that range)
-  m_gBuffer.bindForWriting(m_cam.getNearClip(), m_cam.getFarClip());
-
   glDisable(GL_CULL_FACE); // cull backfaces
   glCullFace(GL_BACK);
   
   glColor4f(1.0, 1.0, 1.0, 1.0);
+
   
-  m_cam.begin();
+  // CREATE GBUFFER
+  // --------------
+  // start our GBuffer for writing (pass in near and far so that we can create linear depth values in that range)
+  m_gBuffer.bindForWriting(m_cam.getNearClip(), m_cam.getFarClip());
 
-    glActiveTexture(GL_TEXTURE0); // bind concrete texture
-    m_texture.getTextureReference().bind();
+    m_cam.begin();
 
-  // draw our randomly rotate boxes
-  for (vector<Box>::iterator it=m_boxes.begin() ; it < m_boxes.end(); it++) {
-    ofPushMatrix();
-    ofRotate(it->angle, it->axis_x, it->axis_y, it->axis_z);
-    ofBox( it->pos, it->size );
-    ofPopMatrix();
-  }
-  
-  // draw all of our light spheres so we can see where our lights are at
-  for (vector<Light>::iterator it = m_lights.begin(); it != m_lights.end(); it++) {
-    ofSphere(it->getGlobalPosition(), 0.25f);
-  }
+      glActiveTexture(GL_TEXTURE0); // bind concrete texture
+      m_texture.getTextureReference().bind();
 
-  glBindTexture(GL_TEXTURE_2D, 0); // unbind the texture
+    // draw our randomly rotate boxes
+    for (vector<Box>::iterator it=m_boxes.begin() ; it < m_boxes.end(); it++) {
+      ofPushMatrix();
+      ofRotate(it->angle, it->axis_x, it->axis_y, it->axis_z);
+      ofBox( it->pos, it->size );
+      ofPopMatrix();
+    }
+    
+    // draw all of our light spheres so we can see where our lights are at
+    for (vector<Light>::iterator it = m_lights.begin(); it != m_lights.end(); it++) {
+      ofSphere(it->getGlobalPosition(), 0.25f);
+    }
 
-  m_cam.end();
+    glBindTexture(GL_TEXTURE_2D, 0); // unbind the texture
+
+    m_cam.end();
   
   m_gBuffer.unbindForWriting(); // done rendering out to our GBuffer
   
-  // create SSAO texture
-  m_ssaoPass.applySSAO(m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_POSITION),
-                       m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_NORMAL),
-                       m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH));
   
+  // GENERATE SSAO TEXTURE
+  // ---------------------
+  // pass in texture units. ssaoPass.applySSAO() expects the required textures to already be bound at these units
+  m_ssaoPass.applySSAO(m_textureUnits[TEX_UNIT_POSITION],
+                       m_textureUnits[TEX_UNIT_NORMAL],
+                       m_textureUnits[TEX_UNIT_DEPTH]);
+  
+  
+  // FINAL DEFERRED RENDERING PASS
+  // -----------------------------
   // put all light positions and colours into float arrays so they can be sent as uniforms
   // very inefficient way of doing this - UBOs would be better, or using arrays with pointers to each rgba block
-  // but this is clear
-  ofMatrix4x4 camModelViewMatrix = m_cam.getModelViewMatrix();
+  
+  ofMatrix4x4 camModelViewMatrix = m_cam.getModelViewMatrix(); // need to multiply light positions by camera's modelview matrix to transform them from world space to view space (reason for this is our normals and positions in the GBuffer are in view space so we must do our lighting calculations in the same space). It's faster to do it here on CPU vs. in shader
   
   vector<float> lightPositions;
   vector<float> ambient;
@@ -170,67 +229,29 @@ void testApp::draw() {
   vector<float> specular;
   
   for (vector<Light>::iterator it = m_lights.begin(); it != m_lights.end(); it++) {
-    // everything in GBuffer is in view space, so we must make our light positions
-    // in same space. Faster to do it here and pass it as a uniform than to do it in shader
-    // for each vertex or fragment
     ofVec3f lightPosInViewSpace = it->getPosition() * camModelViewMatrix;
     
-    lightPositions.push_back(lightPosInViewSpace.x);
-    lightPositions.push_back(lightPosInViewSpace.y);
-    lightPositions.push_back(lightPosInViewSpace.z);
-    
-    ambient.push_back(it->ambient[0]);
-    ambient.push_back(it->ambient[1]);
-    ambient.push_back(it->ambient[2]);
-    ambient.push_back(it->ambient[3]);
-    
-    diffuse.push_back(it->diffuse[0]);
-    diffuse.push_back(it->diffuse[1]);
-    diffuse.push_back(it->diffuse[2]);
-    diffuse.push_back(it->diffuse[3]);
-    
-    specular.push_back(it->specular[0]);
-    specular.push_back(it->specular[1]);
-    specular.push_back(it->specular[2]);
-    specular.push_back(it->specular[3]);
+    lightPositions.insert(lightPositions.end(), lightPosInViewSpace.getPtr(), lightPosInViewSpace.getPtr()+3);
+    ambient.insert(ambient.end(), it->ambient, it->ambient+4);
+    diffuse.insert(diffuse.end(), it->diffuse, it->diffuse+4);
+    specular.insert(specular.end(), it->specular, it->specular+4);
   }
   
+  // final deferred shading pass
+  m_shader.begin();
   
-  m_shader.begin();  // our final deferred scene shader
-
-  // bind all GBuffer textures
-  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_DIFFUSE));
-  glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_POSITION));
-  glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_NORMAL));
-  glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH));
-  // bind SSAO texture
-  glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, m_ssaoPass.getTextureReference().texData.textureID);
+    // pass in lighting info
+    int numLights = m_lights.size();
+    m_shader.setUniform1i("u_numLights", numLights);
+    m_shader.setUniform3fv("u_lightPosition", &lightPositions[0], numLights);
+    m_shader.setUniform4fv("u_lightAmbient", &ambient[0], numLights);
+    m_shader.setUniform4fv("u_lightDiffuse", &diffuse[0], numLights);
+    m_shader.setUniform4fv("u_lightSpecular", &specular[0], numLights);
+    
+    drawScreenQuad(); // draw full screen quad
   
-  m_shader.setUniform1i("u_albedoTex", 0);
-  m_shader.setUniform1i("u_positionTex", 1);
-  m_shader.setUniform1i("u_normalTex", 2);
-  m_shader.setUniform1i("u_linearDepthTex", 3);
-  m_shader.setUniform1i("u_ssaoTex", 4);
-  
-  // pass in lighting info
-  int numLights = m_lights.size();
-  m_shader.setUniform1i("u_numLights", numLights);
-  m_shader.setUniform3fv("u_lightPosition", &lightPositions[0], numLights);
-  m_shader.setUniform4fv("u_lightAmbient", &ambient[0], numLights);
-  m_shader.setUniform4fv("u_lightDiffuse", &diffuse[0], numLights);
-  m_shader.setUniform4fv("u_lightSpecular", &specular[0], numLights);
-  
-  drawScreenQuad(); // draw full screen quad
-  
-  // unbind textures and reset active texture back to zero (OF expects it at 0 - things like ofDrawBitmapString() will break otherwise)
-  glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
-
   m_shader.end();
-
+  
   // draw our debug/message string
   ofEnableAlphaBlending();
   ofDisableLighting();
@@ -240,12 +261,12 @@ void testApp::draw() {
   
   if (m_bDrawDebug) {
     m_gBuffer.drawDebug(0, 0);
-    m_ssaoPass.drawDebug(0, 256, 256, 256);
+    m_ssaoPass.drawDebug(0, ofGetWindowHeight()/4);
   }
   
   ofSetColor(255, 255, 255, 255);
   char debug_str[255];
-  sprintf(debug_str, "Number of lights: %li\nPress SPACE to toggle drawing of debug buffers\nPress +/- to add and remove lights", m_lights.size());
+  sprintf(debug_str, "Frame rate: %f\nNumber of lights: %li\nPress SPACE to toggle drawing of debug buffers\nPress +/- to add and remove lights", ofGetFrameRate(), m_lights.size());
   ofDrawBitmapString(debug_str, ofPoint(15, 20));
 }
 
@@ -271,7 +292,7 @@ void testApp::drawScreenQuad() {
 void testApp::keyPressed(int key){
   if (key == ' ') {
     m_bDrawDebug = !m_bDrawDebug;
-  }if (key == '+' || key == '=') {
+  } if (key == '+' || key == '=') {
     addRandomLight();
   } else if (key == '-' ) {
     if (m_lights.size()) {

@@ -11,11 +11,10 @@ public:
   ~SSAOPass();
 
   void setup(int w, int h, int numSamples=12);
-  void applySSAO(ofTexture& positionTex, ofTexture& normalTex, ofTexture& depthTex);
   void applySSAO(GLuint positionTex, GLuint normalTex, GLuint depthTex);
-  void drawDebug(int x, int y, int w, int h);
+  void drawDebug(int x, int y);
   
-  ofTexture& getTextureReference();
+  GLuint getTextureReference();
 
 private:
   static const ofVec2f  s_quadVerts[];
@@ -30,7 +29,8 @@ private:
   
   ofShader  m_ssaoShader;
   ofImage   m_randomTexture;
-  ofFbo     m_fbo;
+  GLuint    m_fbo;
+  GLuint    m_ssaoTex;
   
   void drawScreenQuad();
 };
