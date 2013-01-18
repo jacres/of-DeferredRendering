@@ -3,18 +3,21 @@
 //  http://github.com/jacres
 //  @jimmyacres
 
-#ifndef __deferred__light__
-#define __deferred__light__
+#ifndef __deferred__pointlight__
+#define __deferred__pointlight__
 
 #include <iostream>
 #include "ofMain.h"
 
-class Light : public ofNode {
+class PointLight : public ofNode {
 public:
-  Light() {
+  PointLight() :
+  intensity(1.0f)
+  {
     memset(ambient, 0, sizeof(ambient));
     memset(diffuse, 0, sizeof(diffuse));
     memset(specular, 0, sizeof(specular));
+    memset(attenuation, 1.0f, sizeof(attenuation));
   }
   
   void setAmbient(float r, float g, float b, float a=1.0f) {
@@ -37,12 +40,21 @@ public:
     specular[2] = b;
     specular[3] = a;
   }
-
+  
+  void setAttenuation(float constant, float linear, float exponential) {
+    attenuation[0] = constant;
+    attenuation[1] = linear;
+    attenuation[2] = exponential;
+  }
+  
   float ambient[4];
   float diffuse[4];
   float specular[4];
+  float attenuation[3];
+
+  float intensity;
   
   ofVec3f orbitAxis;
 };
 
-#endif /* defined(__deferred__light__) */
+#endif /* defined(__deferred__pointlight__) */

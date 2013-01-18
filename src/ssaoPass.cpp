@@ -86,11 +86,6 @@ GLuint SSAOPass::getTextureReference() {
 }
 
 void SSAOPass::applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint depthTexUnit) {
-  glDisable(GL_DEPTH_TEST);
-  glDepthMask(GL_FALSE);
-  
-  glEnable(GL_BLEND);
-  
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo);
   GLuint drawBuffers[] = {GL_COLOR_ATTACHMENT0};
   glDrawBuffers(1, drawBuffers);
@@ -112,9 +107,9 @@ void SSAOPass::applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint de
   m_ssaoShader.setUniform1f("u_texelWidth", m_texel_w);
   m_ssaoShader.setUniform1f("u_texelHeight", m_texel_h);
   
-  m_ssaoShader.setUniform1f("u_occluderBias", 0.05f);
-  m_ssaoShader.setUniform1f("u_samplingRadius", 20.0f);
-  m_ssaoShader.setUniform2f("u_attenuation", 1.0f, 0.005f);
+  m_ssaoShader.setUniform1f("u_occluderBias", 0.0005f);
+  m_ssaoShader.setUniform1f("u_samplingRadius", 25.0f);
+  m_ssaoShader.setUniform2f("u_attenuation", 1.0f, 0.0005f);
   
   drawScreenQuad();
 
@@ -125,9 +120,6 @@ void SSAOPass::applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint de
  
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
   glDrawBuffer(GL_BACK);
-  
-  glEnable(GL_DEPTH_TEST);
-  glDepthMask(GL_TRUE);
 }
 
 void SSAOPass::drawScreenQuad() {

@@ -10,7 +10,7 @@
 #include "ofMain.h"
 #include "gBuffer.h"
 #include "ssaoPass.h"
-#include "light.h"
+#include "pointLight.h"
 
 class testApp : public ofBaseApp {
 
@@ -32,8 +32,9 @@ class testApp : public ofBaseApp {
     {}
   };
   
-  static const int skNumLights = 25;
+  static const int skNumLights = 100;
   static const int skRadius = 20;
+  static const int skMaxPointLightRadius = 7;
 
   enum TEXTURE_UNITS {
     TEX_UNIT_ALBEDO,
@@ -64,11 +65,19 @@ public:
   void setupModel();
   void setupLights();
   void setupScreenQuad();
-  void createRandomBoxes();
+  
   void addRandomLight();
+  void createRandomBoxes();
+  void randomizeLightColors();
+  
   void unbindGBufferTextures();
   void bindGBufferTextures();
+  
   void drawScreenQuad();
+  
+  void geometryPass();
+  void pointLightPass();
+  void deferredRender();
   
   GBuffer m_gBuffer;
   SSAOPass m_ssaoPass;
@@ -76,16 +85,21 @@ public:
   ofVbo m_quadVbo;
 
   ofShader m_shader;
-
+  ofShader m_pointLightPassShader;
+  
   ofEasyCam m_cam;
   
   ofImage m_texture;
   
   GLuint m_textureUnits[TEX_UNIT_NUM_UNITS];
+  GLuint m_fbo;
+  GLuint m_renderTex;
   
   float   m_angle;    
+  
   bool    m_bDrawDebug;
+  bool    m_bPulseLights;
   
   vector<Box> m_boxes;
-  vector<Light> m_lights;
+  vector<PointLight> m_lights;
 };

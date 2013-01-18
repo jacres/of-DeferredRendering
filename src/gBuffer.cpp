@@ -49,7 +49,7 @@ bool GBuffer::setupFbo() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_buffer_w, m_buffer_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_buffer_w, m_buffer_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_DIFFUSE], 0);
   
   // position (32-bit RGB float for accuracy)
@@ -117,17 +117,27 @@ void GBuffer::bindForWriting(float near, float far) {
   glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
   glDrawBuffers(GBUFFER_NUM_TEXTURES, m_drawBuffers);
 
+  glDepthMask(GL_TRUE);
+
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+  glEnable(GL_DEPTH_TEST);
   
+  glDisable(GL_BLEND);
+
   m_gBufferShader.begin();
   m_gBufferShader.setUniform1i("u_texture", 0);
   m_gBufferShader.setUniform1f("u_linearDepthConstant", 1.0f/(far-near));
 }
 
 void GBuffer::unbindForWriting() {
+  
   m_gBufferShader.end();
 
+  glDepthMask(GL_FALSE);
+  glDisable(GL_DEPTH_TEST);
+  
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glDrawBuffer(GL_BACK);
 }
