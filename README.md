@@ -13,6 +13,7 @@ The SSAO implemented in this example uses the basic method outlined in this grea
 
 Very much WIP - a few things left to do:
 - extract view-space position from depth and remove view-space position from GBuffer
+- fix the allowing of light to go trough objects
 - material indexing / storing lookup values for material properties in a 3D texture .. or maybe just storing specular value in gbuffer?
 
 Screenshots from http://www.flickr.com/photos/85184046@N07/
