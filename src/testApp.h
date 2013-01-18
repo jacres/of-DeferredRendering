@@ -34,7 +34,7 @@ class testApp : public ofBaseApp {
   
   static const int skNumLights = 100;
   static const int skRadius = 20;
-  static const int skMaxPointLightRadius = 7;
+  static const int skMaxPointLightRadius = 8;
 
   enum TEXTURE_UNITS {
     TEX_UNIT_ALBEDO,

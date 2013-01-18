@@ -55,9 +55,20 @@ void main(void)
     float distance = length(lightDir);
     
     if (distance <= u_lightRadius) {
-      float attenuation = 1.0 - distance/u_lightRadius;
+      // different attenuation methods - we have to stay within bounding radius, so it's a bit trickier than forward rendering
+//      float attenuation = 1.0 - distance/u_lightRadius;
 //      float attenuation = 1.0 / (u_lightAttenuation.x + u_lightAttenuation.y * distance + u_lightAttenuation.z * distance * distance);
-      //attenuation = max(1.0, attenuation);
+//      //attenuation = max(1.0, attenuation);
+
+//      (1-(x/r)^2)^3
+//      float attenuation = (1.0 - pow(pow(distance/u_lightRadius, 2), 3));
+  
+      float distancePercent = distance/u_lightRadius;
+      float damping_factor = 1.0 - pow(distancePercent, 3);
+      float attenuation = 1.0/(u_lightAttenuation.x +
+                               u_lightAttenuation.y * distance +
+                               u_lightAttenuation.z * distance * distance);
+      attenuation *= damping_factor;
       
       vec4 diffuseContribution = material1.diffuse * u_lightDiffuse * lambert;
       diffuseContribution *= u_lightIntensity;

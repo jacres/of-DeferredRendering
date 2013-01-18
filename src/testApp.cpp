@@ -10,7 +10,7 @@
 testApp::testApp() :
 m_angle(0),
 m_bDrawDebug(true),
-m_bPulseLights(true)
+m_bPulseLights(false)
 {};
 
 //--------------------------------------------------------------
@@ -112,6 +112,8 @@ void testApp::setupLights() {
   for (unsigned int i=0; i<skNumLights; i++) {
     addRandomLight();
   }
+  
+  randomizeLightColors();
 }
 
 void testApp::addRandomLight() {
@@ -124,7 +126,7 @@ void testApp::addRandomLight() {
   orbitAxis.normalize();
   l.orbitAxis = orbitAxis;
   
-  posOnSphere.scale(skRadius-2);
+  posOnSphere.scale(skRadius-1);
   
   l.setPosition(posOnSphere);
   l.setAmbient(0.0f, 0.0f, 0.0f);
@@ -132,7 +134,8 @@ void testApp::addRandomLight() {
   ofVec3f col = ofVec3f(1.0, 1.0, 1.0);
   l.setDiffuse(col.x, col.y, col.z);
   l.setSpecular(col.x, col.y, col.z);
-  l.setAttenuation(0.0f, 0.0f, 0.5f); // set constant, linear, and exponential attenuation
+  l.setAttenuation(0.0f, 0.0f, 0.1f); // set constant, linear, and exponential attenuation
+  l.intensity = 0.7f;
   
   m_lights.push_back(l);
 }
