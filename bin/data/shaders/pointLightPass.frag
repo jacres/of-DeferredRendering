@@ -41,9 +41,9 @@ void main(void)
   vec3 vertex = texture2D(u_positionTex, texCoord.st).xyz;
   vec3 normal = texture2D(u_normalTex, texCoord.st).xyz;
 
-  vec4 ambient;
-  vec4 diffuse;
-  vec4 specular;
+  vec4 ambient = vec4(0.0, 0.0, 0.0, 1.0);
+  vec4 diffuse = vec4(0.0, 0.0, 0.0, 1.0);
+  vec4 specular = vec4(0.0, 0.0, 0.0, 1.0);
 
   vec3 lightDir = u_lightPosition - vertex;
   vec3 R = normalize(reflect(lightDir, normal));
