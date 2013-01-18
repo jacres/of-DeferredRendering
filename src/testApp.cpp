@@ -26,7 +26,7 @@ void testApp::setup() {
 
   m_cam.setupPerspective( false, 45.0f, 0.1f, 100.0f );
   m_cam.setDistance(40.0f);
-  m_cam.setGlobalPosition( 0.0f, 0.0f, 50.0f );
+  m_cam.setGlobalPosition( 0.0f, 0.0f, 40.0f );
   m_cam.lookAt( ofVec3f( 0.0f, 0.0f, 0.0f ) );
   
   m_shader.load("shaders/mainScene.vert", "shaders/mainScene.frag");
