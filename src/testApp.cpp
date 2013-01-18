@@ -15,7 +15,7 @@ m_bPulseLights(false)
 
 //--------------------------------------------------------------
 void testApp::setup() {
-  ofSetVerticalSync(true); // can cause problems on some Linux implementations
+  ofSetVerticalSync(false); // can cause problems on some Linux implementations
   ofDisableArbTex();
   
   // set up our gbuffer and ssao pass
@@ -129,7 +129,7 @@ void testApp::addRandomLight() {
   l.setPosition(posOnSphere);
   l.setAmbient(0.0f, 0.0f, 0.0f);
   
-  ofVec3f col = ofVec3f(ofRandom(0.4f, 1.0f), ofRandom(0.1f, 1.0f), ofRandom(0.3f, 1.0f));
+  ofVec3f col = ofVec3f(ofRandom(0.1f, 0.5f), ofRandom(0.2f, 0.4f), ofRandom(0.4f, 1.0f));
   l.setDiffuse(col.x, col.y, col.z);
   l.setSpecular(col.x, col.y, col.z);
   l.setAttenuation(0.0f, 0.0f, 0.08f); // set constant, linear, and exponential attenuation
