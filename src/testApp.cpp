@@ -26,7 +26,7 @@ void testApp::setup() {
 
   m_cam.setupPerspective( false, 45.0f, 0.1f, 100.0f );
   m_cam.setDistance(40.0f);
-  m_cam.setGlobalPosition( 0.0f, 0.0f, 40.0f );
+  m_cam.setGlobalPosition( 0.0f, 0.0f, 35.0f );
   m_cam.lookAt( ofVec3f( 0.0f, 0.0f, 0.0f ) );
   
   m_shader.load("shaders/mainScene.vert", "shaders/mainScene.frag");
@@ -112,8 +112,6 @@ void testApp::setupLights() {
   for (unsigned int i=0; i<skNumLights; i++) {
     addRandomLight();
   }
-  
-  randomizeLightColors();
 }
 
 void testApp::addRandomLight() {
@@ -131,10 +129,10 @@ void testApp::addRandomLight() {
   l.setPosition(posOnSphere);
   l.setAmbient(0.0f, 0.0f, 0.0f);
   
-  ofVec3f col = ofVec3f(1.0, 1.0, 1.0);
+  ofVec3f col = ofVec3f(ofRandom(0.4f, 1.0f), ofRandom(0.1f, 1.0f), ofRandom(0.3f, 1.0f));
   l.setDiffuse(col.x, col.y, col.z);
   l.setSpecular(col.x, col.y, col.z);
-  l.setAttenuation(0.0f, 0.0f, 0.1f); // set constant, linear, and exponential attenuation
+  l.setAttenuation(0.0f, 0.0f, 0.08f); // set constant, linear, and exponential attenuation
   l.intensity = 0.7f;
   
   m_lights.push_back(l);
