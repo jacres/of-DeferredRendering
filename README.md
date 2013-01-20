@@ -4,7 +4,7 @@ A basic and work in progress deferred rendering system + SSAO for openFrameworks
 
 Tested with OF 0073 on OS X 10.7+10.8. This uses OpenGl 2.1 + GLSL 1.20 in order to stay as compatible as possible with the way OF works with rendering.
 
-A GBuffer class and shader (gbuffer.frag/.vert) show how to generate a GBuffer containing view-space position, view-space normals, linear depth, and albedo (full colour)
+A GBuffer class and shader (gbuffer.frag/.vert) show how to generate a GBuffer containing view-space normals, linear depth, and albedo (full colour)
 
 mainScene.frag shows how to use the GBuffer textures to perform deferred shading in view-space.
 
