@@ -34,7 +34,7 @@ SSAOPass::SSAOPass() :
 SSAOPass::~SSAOPass() {
 }
 
-void SSAOPass::setup(int w, int h, int numSamples) {
+bool SSAOPass::setup(int w, int h, int numSamples) {
   m_fbo_w = w;
   m_fbo_h = h;
   
@@ -79,6 +79,8 @@ void SSAOPass::setup(int w, int h, int numSamples) {
   
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glBindTexture(GL_TEXTURE_2D, 0);
+  
+  return true;
 }
 
 GLuint SSAOPass::getTextureReference() {

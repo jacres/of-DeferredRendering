@@ -76,7 +76,6 @@ void testApp::setup() {
   
   if (status != GL_FRAMEBUFFER_COMPLETE) {
     cout << "ssaoPass::setup() - error could not create framebuffer" << endl;
-    return false;
   }
   
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
