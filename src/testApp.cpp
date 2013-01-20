@@ -9,6 +9,8 @@
 
 testApp::testApp() :
 m_angle(0),
+m_windowWidth(0),
+m_windowHeight(0),
 m_bDrawDebug(true),
 m_bPulseLights(false)
 {};
@@ -16,11 +18,20 @@ m_bPulseLights(false)
 //--------------------------------------------------------------
 void testApp::setup() {
   ofSetVerticalSync(false); // can cause problems on some Linux implementations
+  
   ofDisableArbTex();
   
+  if (ofGetWindowMode() == OF_FULLSCREEN) {
+    m_windowWidth = ofGetScreenWidth();
+    m_windowHeight = ofGetScreenHeight();
+  } else {
+    m_windowWidth = ofGetWindowWidth();
+    m_windowHeight = ofGetWindowHeight();
+  }
+  
   // set up our gbuffer and ssao pass
-  m_gBuffer.setup(ofGetWindowWidth(), ofGetWindowHeight());
-  m_ssaoPass.setup(ofGetWindowWidth(), ofGetWindowHeight(), 12);
+  m_gBuffer.setup(m_windowWidth, m_windowHeight);
+  m_ssaoPass.setup(m_windowWidth, m_windowHeight, 12);
 
   setupScreenQuad();
 
@@ -28,6 +39,8 @@ void testApp::setup() {
   m_cam.setDistance(40.0f);
   m_cam.setGlobalPosition( 0.0f, 0.0f, 35.0f );
   m_cam.lookAt( ofVec3f( 0.0f, 0.0f, 0.0f ) );
+  
+  m_ssaoPass.setCameraProperties(m_cam.getProjectionMatrix().getInverse(), m_cam.getFarClip());
   
   m_shader.load("shaders/mainScene.vert", "shaders/mainScene.frag");
   m_pointLightPassShader.load("shaders/pointLightPass.vert", "shaders/pointLightPass.frag");
@@ -45,12 +58,12 @@ void testApp::setup() {
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ofGetWindowWidth(), ofGetWindowHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_windowWidth, m_windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
   
   GLuint rbo;
   glGenRenderbuffers(1, &rbo);
   glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, ofGetWindowWidth(), ofGetWindowWidth());
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, m_windowWidth, m_windowHeight);
   
   // create an fbo
   glGenFramebuffers(1, &m_fbo);
@@ -71,6 +84,8 @@ void testApp::setup() {
   glBindTexture(GL_TEXTURE_2D, 0);
   
   bindGBufferTextures(); // bind them once to upper texture units - faster than binding/unbinding every frame
+
+//  generateViewRayTexture();
 }
 
 void testApp::setupScreenQuad() {
@@ -119,6 +134,7 @@ void testApp::addRandomLight() {
   PointLight l;
   ofVec3f posOnSphere = ofVec3f(ofRandom(-1.0f, 1.0f), ofRandom(-1.0f, 1.0f), ofRandom(-1.0f, 1.0f));
   posOnSphere.normalize();
+  posOnSphere.scale(ofRandom(0.95f, 1.05f));
   
   ofVec3f orbitAxis = ofVec3f(ofRandom(0.0f, 1.0f), ofRandom(0.0f, 1.0f), ofRandom(0.0f, 1.0f));
   orbitAxis.normalize();
@@ -129,11 +145,11 @@ void testApp::addRandomLight() {
   l.setPosition(posOnSphere);
   l.setAmbient(0.0f, 0.0f, 0.0f);
   
-  ofVec3f col = ofVec3f(ofRandom(0.1f, 0.5f), ofRandom(0.2f, 0.4f), ofRandom(0.4f, 1.0f));
+  ofVec3f col = ofVec3f(ofRandom(0.3f, 0.5f), ofRandom(0.2f, 0.4f), ofRandom(0.7f, 1.0f));
   l.setDiffuse(col.x, col.y, col.z);
   l.setSpecular(col.x, col.y, col.z);
-  l.setAttenuation(0.0f, 0.0f, 0.08f); // set constant, linear, and exponential attenuation
-  l.intensity = 0.7f;
+  l.setAttenuation(0.0f, 0.0f, 0.2f); // set constant, linear, and exponential attenuation
+  l.intensity = 0.8f;
   
   m_lights.push_back(l);
 }
@@ -147,44 +163,37 @@ void testApp::randomizeLightColors() {
 
 void testApp::bindGBufferTextures() {
   // set up the texture units we want to use - we're using them every frame, so we'll leave them bound to these units to save speed vs. binding/unbinding
-  m_textureUnits[TEX_UNIT_ALBEDO] = 11;
-  m_textureUnits[TEX_UNIT_POSITION] = 12;
-  m_textureUnits[TEX_UNIT_NORMAL] = 13;
-  m_textureUnits[TEX_UNIT_DEPTH] = 14;
-  m_textureUnits[TEX_UNIT_SSAO] = 15;
+  m_textureUnits[TEX_UNIT_ALBEDO] = 15;
+  m_textureUnits[TEX_UNIT_NORMALS_DEPTH] = 14;
+  m_textureUnits[TEX_UNIT_SSAO] = 13;
+  m_textureUnits[TEX_UNIT_POINTLIGHT_PASS] = 12;
   
   // bind all GBuffer textures
   glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_ALBEDO]);
-  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_DIFFUSE));
+  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_ALBEDO));
   
-  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_POSITION]);
-  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_POSITION));
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_NORMALS_DEPTH]);
+  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_NORMALS_DEPTH));
   
-  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_NORMAL]);
-  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_NORMAL));
-  
-  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_DEPTH]);
-  glBindTexture(GL_TEXTURE_2D, m_gBuffer.getTexture(GBuffer::GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH));
-
   // bind SSAO texture
   glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_SSAO]);
   glBindTexture(GL_TEXTURE_2D, m_ssaoPass.getTextureReference());
   
+  // point light pass texture
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_POINTLIGHT_PASS]);
+  glBindTexture(GL_TEXTURE_2D, m_renderTex);
+
   m_shader.begin();  // our final deferred scene shader
   m_shader.setUniform1i("u_albedoTex", m_textureUnits[TEX_UNIT_ALBEDO]);
-  m_shader.setUniform1i("u_positionTex", m_textureUnits[TEX_UNIT_POSITION]);
-  m_shader.setUniform1i("u_normalTex", m_textureUnits[TEX_UNIT_NORMAL]);
-  m_shader.setUniform1i("u_linearDepthTex", m_textureUnits[TEX_UNIT_DEPTH]);
   m_shader.setUniform1i("u_ssaoTex", m_textureUnits[TEX_UNIT_SSAO]);
+  m_shader.setUniform1i("u_pointLightPassTex", m_textureUnits[TEX_UNIT_POINTLIGHT_PASS]);
   m_shader.end();
   
   m_pointLightPassShader.begin();  // our point light pass shader
   m_pointLightPassShader.setUniform1i("u_albedoTex", m_textureUnits[TEX_UNIT_ALBEDO]);
-  m_pointLightPassShader.setUniform1i("u_positionTex", m_textureUnits[TEX_UNIT_POSITION]);
-  m_pointLightPassShader.setUniform1i("u_normalTex", m_textureUnits[TEX_UNIT_NORMAL]);
-  m_pointLightPassShader.setUniform1i("u_linearDepthTex", m_textureUnits[TEX_UNIT_DEPTH]);
+  m_pointLightPassShader.setUniform1i("u_normalAndDepthTex", m_textureUnits[TEX_UNIT_NORMALS_DEPTH]);
   m_pointLightPassShader.setUniform1i("u_ssaoTex", m_textureUnits[TEX_UNIT_SSAO]);
-  m_pointLightPassShader.setUniform2f("u_inverseScreenSize", 1.0f/ofGetWindowWidth(), 1.0f/ofGetWindowHeight());
+  m_pointLightPassShader.setUniform2f("u_inverseScreenSize", 1.0f/m_windowWidth, 1.0f/m_windowHeight);
   m_pointLightPassShader.end();
 
   glActiveTexture(GL_TEXTURE0);
@@ -193,9 +202,7 @@ void testApp::bindGBufferTextures() {
 void testApp::unbindGBufferTextures() {
   // unbind textures and reset active texture back to zero (OF expects it at 0 - things like ofDrawBitmapString() will break otherwise)
   glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_ALBEDO]); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_POSITION]); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_NORMAL]); glBindTexture(GL_TEXTURE_2D, 0);
-  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_DEPTH]); glBindTexture(GL_TEXTURE_2D, 0);
+  glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_NORMALS_DEPTH]); glBindTexture(GL_TEXTURE_2D, 0);
   glActiveTexture(GL_TEXTURE0 + m_textureUnits[TEX_UNIT_SSAO]); glBindTexture(GL_TEXTURE_2D, 0);
   
   glActiveTexture(GL_TEXTURE0);
@@ -236,6 +243,8 @@ void testApp::pointLightPass() {
   
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo);
   
+  glDisable(GL_CULL_FACE); // need to do this to draw planes in OF because of vertex ordering
+
   // enable additive blending since we're going to add all the light colours together as they are individually drawn
   glEnable(GL_BLEND);
   glBlendEquation(GL_FUNC_ADD);
@@ -252,6 +261,7 @@ void testApp::pointLightPass() {
     // pass in lighting info
     int numLights = m_lights.size();
     m_pointLightPassShader.setUniform1i("u_numLights", numLights);
+    m_pointLightPassShader.setUniform1f("u_farDistance", m_cam.getFarClip());
 
     ofMatrix4x4 camModelViewMatrix = m_cam.getModelViewMatrix(); // need to multiply light positions by camera's modelview matrix to transform them from world space to view space (reason for this is our normals and positions in the GBuffer are in view space so we must do our lighting calculations in the same space). It's faster to do it here on CPU vs. in shader
 
@@ -267,7 +277,6 @@ void testApp::pointLightPass() {
       m_pointLightPassShader.setUniform3fv("u_lightAttenuation", it->attenuation);
       
       float radius = it->intensity * skMaxPointLightRadius;
-      
       m_pointLightPassShader.setUniform1f("u_lightRadius", radius);
       
       ofPushMatrix();
@@ -291,11 +300,7 @@ void testApp::deferredRender() {
   glDisable(GL_DEPTH_TEST);
   ofDisableLighting();
   
-  glActiveTexture(GL_TEXTURE7);
-  glBindTexture(GL_TEXTURE_2D, m_renderTex);
-  
   m_shader.begin();
-    m_shader.setUniform1i("u_pointLightPassTex", 7);
     drawScreenQuad();
   m_shader.end();
 
@@ -313,7 +318,7 @@ void testApp::update() {
   // we created them
   for (vector<PointLight>::iterator it = m_lights.begin(); it != m_lights.end(); it++) {
     float percent = count/(float)m_lights.size();
-    it->rotateAround(percent * 0.25f + 0.1f, it->orbitAxis, ofVec3f(0.0f, 0.0f, 0.0f));
+    it->rotateAround(percent * 0.5f + 0.2f, it->orbitAxis, ofVec3f(0.0f, 0.0f, 0.0f));
     
     if (m_bPulseLights) {
       it->intensity = 0.5f + 0.25f * (1.0f + cosf(time + percent*PI)); // pulse between 0.5 and 1
@@ -330,7 +335,6 @@ void testApp::draw() {
   glCullFace(GL_BACK);
   
   glColor4f(1.0, 1.0, 1.0, 1.0);
-
   
   geometryPass();
   pointLightPass();
@@ -339,18 +343,13 @@ void testApp::draw() {
   // GENERATE SSAO TEXTURE
   // ---------------------
   // pass in texture units. ssaoPass.applySSAO() expects the required textures to already be bound at these units
-  m_ssaoPass.applySSAO(m_textureUnits[TEX_UNIT_POSITION],
-                       m_textureUnits[TEX_UNIT_NORMAL],
-                       m_textureUnits[TEX_UNIT_DEPTH]);
+  m_ssaoPass.applySSAO(m_textureUnits[TEX_UNIT_NORMALS_DEPTH]);
   
-  
-
   deferredRender();
-
   
   if (m_bDrawDebug) {
     m_gBuffer.drawDebug(0, 0);
-    m_ssaoPass.drawDebug(0, ofGetWindowHeight()/4);
+    m_ssaoPass.drawDebug(ofGetWidth()/4*2, 0);
 
     // draw our debug/message string
     ofEnableAlphaBlending();
@@ -358,7 +357,7 @@ void testApp::draw() {
 
     ofSetColor(255, 255, 255, 255);
     char debug_str[255];
-    sprintf(debug_str, "Frame rate: %f\nNumber of lights: %li\nPress SPACE to toggle drawing of debug buffers\nPress +/- to add and remove lights\n'p' to toggle pulsing of light intensity\n'r' to randomize light colours", ofGetFrameRate(), m_lights.size());
+    sprintf(debug_str, "Framerate: %f\nNumber of lights: %li\nPress SPACE to toggle drawing of debug buffers\nPress +/- to add and remove lights\n'p' to toggle pulsing of light intensity\n'r' to randomize light colours", ofGetFrameRate(), m_lights.size());
     ofDrawBitmapString(debug_str, ofPoint(15, 20));
   }
 }
@@ -371,10 +370,10 @@ void testApp::drawScreenQuad() {
   glMatrixMode(GL_MODELVIEW);
   glPushMatrix();
   glLoadIdentity();
-  
+
   // draw the full viewport quad
   m_quadVbo.draw(GL_QUADS, 0, 4);
-  
+
   glMatrixMode(GL_MODELVIEW);
   glPopMatrix();
   glMatrixMode(GL_PROJECTION);

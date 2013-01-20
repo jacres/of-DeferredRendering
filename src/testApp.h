@@ -34,14 +34,13 @@ class testApp : public ofBaseApp {
   
   static const int skNumLights = 100;
   static const int skRadius = 20;
-  static const int skMaxPointLightRadius = 8;
+  static const int skMaxPointLightRadius = 10;
 
   enum TEXTURE_UNITS {
     TEX_UNIT_ALBEDO,
-    TEX_UNIT_POSITION,
-    TEX_UNIT_NORMAL,
-    TEX_UNIT_DEPTH,
+    TEX_UNIT_NORMALS_DEPTH,
     TEX_UNIT_SSAO,
+    TEX_UNIT_POINTLIGHT_PASS,
     TEX_UNIT_NUM_UNITS
   };
 
@@ -99,6 +98,9 @@ public:
   
   bool    m_bDrawDebug;
   bool    m_bPulseLights;
+  
+  float m_windowWidth;
+  float m_windowHeight;
   
   vector<Box> m_boxes;
   vector<PointLight> m_lights;

@@ -36,6 +36,6 @@ void main(void)
   lightContribution += pointLightContribution;
   
   vec4 final_color = (ambient * ssao + lightContribution) * albedo;
-
+  
   gl_FragColor = vec4(final_color.rgb, 1.0);
 }

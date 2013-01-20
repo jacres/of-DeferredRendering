@@ -11,7 +11,8 @@ public:
   ~SSAOPass();
 
   void setup(int w, int h, int numSamples=12);
-  void applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint depthTexUnit);
+  void setCameraProperties(const ofMatrix4x4& invProjMatrix, float farDistance);
+  void applySSAO(GLuint normalsAndDepthTexUnit);
   void drawDebug(int x, int y);
   
   GLuint getTextureReference();

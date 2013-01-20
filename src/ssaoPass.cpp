@@ -62,7 +62,7 @@ void SSAOPass::setup(int w, int h, int numSamples) {
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_fbo_w, m_fbo_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, m_fbo_w, m_fbo_h, 0, GL_RGB, GL_FLOAT, NULL);
   
   // create an fbo
   glGenFramebuffers(1, &m_fbo);
@@ -85,7 +85,24 @@ GLuint SSAOPass::getTextureReference() {
   return m_ssaoTex;
 }
 
-void SSAOPass::applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint depthTexUnit) {
+void SSAOPass::setCameraProperties(const ofMatrix4x4& invProjMatrix, float farDistance) {
+  m_ssaoShader.begin();
+  m_ssaoShader.setUniformMatrix4f("u_inverseProjMatrix", invProjMatrix.getPtr());
+  m_ssaoShader.setUniform1f("u_farDistance", farDistance);
+  
+  m_ssaoShader.setUniform1i("u_randomJitterTex", 10);
+  
+  m_ssaoShader.setUniform2f("u_texelSize", m_texel_w, m_texel_h);
+  
+  m_ssaoShader.setUniform1f("u_occluderBias", 0.5f);
+  m_ssaoShader.setUniform1f("u_samplingRadius", 10.0f);
+  m_ssaoShader.setUniform2f("u_attenuation", 0.3f, 0.36f);
+
+  
+  m_ssaoShader.end();
+}
+
+void SSAOPass::applySSAO(GLuint normalsAndDepthTexUnit) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo);
   GLuint drawBuffers[] = {GL_COLOR_ATTACHMENT0};
   glDrawBuffers(1, drawBuffers);
@@ -98,18 +115,8 @@ void SSAOPass::applySSAO(GLuint positionTexUnit, GLuint normalTexUnit, GLuint de
   glBindTexture(GL_TEXTURE_2D, m_randomTexture.getTextureReference().getTextureData().textureID);
   
   m_ssaoShader.begin();
-  
-  m_ssaoShader.setUniform1i("u_randomJitterTex", 10);
-  m_ssaoShader.setUniform1i("u_viewSpacePositionTex", positionTexUnit);
-  m_ssaoShader.setUniform1i("u_normalTex", normalTexUnit);
-  m_ssaoShader.setUniform1i("u_linearDepthTex", depthTexUnit);
-  
-  m_ssaoShader.setUniform1f("u_texelWidth", m_texel_w);
-  m_ssaoShader.setUniform1f("u_texelHeight", m_texel_h);
-  
-  m_ssaoShader.setUniform1f("u_occluderBias", 0.0005f);
-  m_ssaoShader.setUniform1f("u_samplingRadius", 25.0f);
-  m_ssaoShader.setUniform2f("u_attenuation", 1.0f, 0.0005f);
+
+  m_ssaoShader.setUniform1i("u_normalAndDepthTex", normalsAndDepthTexUnit);
   
   drawScreenQuad();
 
@@ -133,7 +140,6 @@ void SSAOPass::drawScreenQuad() {
   
   // draw the full viewport quad
   s_quadVbo.draw(GL_QUADS, 0, 4);
-  
   glMatrixMode(GL_MODELVIEW);
   glPopMatrix();
   glMatrixMode(GL_PROJECTION);
@@ -145,7 +151,7 @@ void SSAOPass::drawDebug(int x, int y) {
   int quarterW = m_fbo_w/4;
   int quarterH = m_fbo_h/4;
   
-  int wy = ofGetWindowHeight() - y - quarterH;
+  int wy = ofGetHeight() - y - quarterH;
   
   glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo);
   

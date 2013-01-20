@@ -43,42 +43,24 @@ bool GBuffer::setupFbo() {
   // create all gbuffer textures
   glGenTextures(GBUFFER_NUM_TEXTURES, m_textures);
   
-  // albedo/diffuse (8-bit channel rgb)
-  glBindTexture(GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_DIFFUSE]);
+  // albedo/diffuse (16-bit channel rgba)
+  glBindTexture(GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_ALBEDO]);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_buffer_w, m_buffer_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_DIFFUSE], 0);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_buffer_w, m_buffer_h, 0, GL_RGBA, GL_FLOAT, NULL);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_ALBEDO, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_ALBEDO], 0);
+    
+  // normals + depth (32-bit RGBA float for accuracy)
+  glBindTexture(GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_NORMALS_DEPTH]);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_buffer_w, m_buffer_h, 0, GL_RGBA, GL_FLOAT, NULL);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_NORMALS_DEPTH, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_NORMALS_DEPTH], 0);
   
-  // position (32-bit RGB float for accuracy)
-  glBindTexture(GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_POSITION]);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_buffer_w, m_buffer_h, 0, GL_RGB, GL_FLOAT, NULL);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_POSITION], 0);
-  
-  // normal (16-bit RGBA float for accuracy)
-  glBindTexture(GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_NORMAL]);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, m_buffer_w, m_buffer_h, 0, GL_RGB, GL_FLOAT, NULL);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_NORMAL], 0);
-  
-  // linear depth (24-bit RGB float for accuracy)
-  glBindTexture(GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH]);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m_buffer_w, m_buffer_h, 0, GL_LUMINANCE, GL_FLOAT, NULL);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, m_textures[GBUFFER_TEXTURE_TYPE_LINEAR_DEPTH], 0);
-
   // create depth texture (we don't use this explicitly, but since we use depth testing when rendering, our FBO needs a depth buffer)
   // we make it a renderbuffer and not a texture as we'll never access it
   GLuint rbo;
@@ -128,7 +110,7 @@ void GBuffer::bindForWriting(float near, float far) {
 
   m_gBufferShader.begin();
   m_gBufferShader.setUniform1i("u_texture", 0);
-  m_gBufferShader.setUniform1f("u_linearDepthConstant", 1.0f/(far-near));
+  m_gBufferShader.setUniform1f("u_farDistance", far);
 }
 
 void GBuffer::unbindForWriting() {
@@ -155,7 +137,7 @@ void GBuffer::drawDebug(int x, int y) {
   int quarterW = m_buffer_w/4;
   int quarterH = m_buffer_h/4;
   
-  int wy = ofGetWindowHeight() - y - quarterH;
+  int wy = ofGetHeight() - y - quarterH;
   
   glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo);
   
@@ -164,12 +146,6 @@ void GBuffer::drawDebug(int x, int y) {
   
   glReadBuffer(GL_COLOR_ATTACHMENT1);
   glBlitFramebuffer(0, 0, m_buffer_w, m_buffer_h, quarterW+x, 0+wy, 2*quarterW+x, quarterH+wy, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-  
-  glReadBuffer(GL_COLOR_ATTACHMENT2);
-  glBlitFramebuffer(0, 0, m_buffer_w, m_buffer_h, 2*quarterW+x, 0+wy, 3*quarterW+x, quarterH+wy, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-  
-  glReadBuffer(GL_COLOR_ATTACHMENT3);
-  glBlitFramebuffer(0, 0, m_buffer_w, m_buffer_h, 3*quarterW+x, 0+wy, 4*quarterW+x, quarterH+wy, GL_COLOR_BUFFER_BIT, GL_LINEAR);
   
   glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 }

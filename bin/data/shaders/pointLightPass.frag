@@ -2,9 +2,7 @@
 
 // deferred g buffers
 uniform sampler2D u_albedoTex;  // albedo (diffuse without lighting)
-uniform sampler2D u_positionTex;  // view space position
-uniform sampler2D u_normalTex;  // view space normal and linear depth
-uniform sampler2D u_linearDepthTex; // linear depth
+uniform sampler2D u_normalAndDepthTex;  // view space normal and linear depth
 
 // LIGHTS
 uniform int u_numLights;
@@ -17,6 +15,9 @@ uniform float u_lightIntensity;
 uniform float u_lightRadius;
 
 uniform vec2 u_inverseScreenSize;
+uniform float u_farDistance;
+
+varying vec4 v_vertex;
 
 struct material {
   vec4 ambient;
@@ -38,8 +39,14 @@ void main(void)
 {
   vec2 texCoord = gl_FragCoord.xy * u_inverseScreenSize.xy;
   
-  vec3 vertex = texture2D(u_positionTex, texCoord.st).xyz;
-  vec3 normal = texture2D(u_normalTex, texCoord.st).xyz;
+  float linearDepth = texture2D(u_normalAndDepthTex, texCoord.st).a;
+  
+  // vector to far plane
+  vec3 viewRay = vec3(v_vertex.xy * (-u_farDistance/v_vertex.z), -u_farDistance);
+  // scale viewRay by linear depth to get view space position
+  vec3 vertex = viewRay * linearDepth;
+  
+  vec3 normal = texture2D(u_normalAndDepthTex, texCoord.st).xyz;
 
   vec4 ambient = vec4(0.0, 0.0, 0.0, 1.0);
   vec4 diffuse = vec4(0.0, 0.0, 0.0, 1.0);
@@ -82,8 +89,8 @@ void main(void)
       specular += specularContribution;
     }
   }
-  
+    
   vec4 final_color = vec4(ambient + diffuse + specular);
-
+  
   gl_FragColor = vec4(final_color.rgb, 1.0);
 }
