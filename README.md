@@ -12,8 +12,7 @@ ssao.frag does a simple SSAO pass using the GBuffer position, depth, and normal 
 The SSAO implemented in this example uses the basic method outlined in this great article by Nathaniel Meyer: http://devmaster.net/posts/3095/shader-effects-screen-space-ambient-occlusion.
 
 Very much WIP - a few things left to do:
-- extract view-space position from depth and remove view-space position from GBuffer
-- fix the allowing of light to go trough objects
+- fix the allowing of light to go through objects through use of stencils
 - material indexing / storing lookup values for material properties in a 3D texture .. or maybe just storing specular value in gbuffer?
 
 Screenshots from http://www.flickr.com/photos/85184046@N07/
