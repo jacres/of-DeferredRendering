@@ -27,6 +27,7 @@ public:
   ~GBuffer();
   
   bool setup(unsigned int windowWidth, unsigned windowHeight);
+  bool setupFbo(unsigned int windowWidth, unsigned int windowHeight);
   
   void bindForWriting(float near, float far);
   void unbindForWriting();
@@ -45,10 +46,10 @@ private:
 
   GLuint m_fbo;
   GLuint m_textures[GBUFFER_NUM_TEXTURES];
+  GLuint m_renderBuffer;
   GLenum m_drawBuffers[GBUFFER_NUM_TEXTURES];
 
   void loadShaders();
-  bool setupFbo();
 };
 
 #endif /* defined(__app__gbuffer__) */

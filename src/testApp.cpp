@@ -21,26 +21,12 @@ void testApp::setup() {
   
   ofDisableArbTex();
   
-  if (ofGetWindowMode() == OF_FULLSCREEN) {
-    m_windowWidth = ofGetScreenWidth();
-    m_windowHeight = ofGetScreenHeight();
-  } else {
-    m_windowWidth = ofGetWindowWidth();
-    m_windowHeight = ofGetWindowHeight();
-  }
-  
-  // set up our gbuffer and ssao pass
-  m_gBuffer.setup(m_windowWidth, m_windowHeight);
-  m_ssaoPass.setup(m_windowWidth, m_windowHeight, 12);
-
   setupScreenQuad();
 
   m_cam.setupPerspective( false, 45.0f, 0.1f, 100.0f );
   m_cam.setDistance(40.0f);
   m_cam.setGlobalPosition( 0.0f, 0.0f, 35.0f );
   m_cam.lookAt( ofVec3f( 0.0f, 0.0f, 0.0f ) );
-  
-  m_ssaoPass.setCameraProperties(m_cam.getProjectionMatrix().getInverse(), m_cam.getFarClip());
   
   m_shader.load("shaders/mainScene.vert", "shaders/mainScene.frag");
   m_pointLightPassShader.load("shaders/pointLightPass.vert", "shaders/pointLightPass.frag");
@@ -49,6 +35,53 @@ void testApp::setup() {
   
   setupLights();
   createRandomBoxes();
+  
+  ofSetSphereResolution(4.0f);
+
+  if (ofGetWindowMode() == OF_FULLSCREEN) {
+    m_windowWidth = ofGetScreenWidth();
+    m_windowHeight = ofGetScreenHeight();
+  } else {
+    m_windowWidth = ofGetWindowWidth();
+    m_windowHeight = ofGetWindowHeight();
+  }
+
+  m_gBuffer.setup(m_windowWidth, m_windowHeight);
+  m_ssaoPass.setup(m_windowWidth, m_windowHeight, 12);
+
+  setupFinalRenderFbo();
+  // set up our gbuffer and ssao pass
+  m_ssaoPass.setCameraProperties(m_cam.getProjectionMatrix().getInverse(), m_cam.getFarClip());
+  
+  bindGBufferTextures(); // bind them once to upper texture units - faster than binding/unbinding every frame
+}
+
+void testApp::resizeBuffersAndTextures() {
+  
+  if (ofGetWindowMode() == OF_FULLSCREEN) {
+    m_windowWidth = ofGetScreenWidth();
+    m_windowHeight = ofGetScreenHeight();
+  } else {
+    m_windowWidth = ofGetWindowWidth();
+    m_windowHeight = ofGetWindowHeight();
+  }
+  
+  m_gBuffer.setupFbo(m_windowWidth, m_windowHeight);
+  m_ssaoPass.setupFbo(m_windowWidth, m_windowHeight);
+  
+  setupFinalRenderFbo();
+
+  // set up our gbuffer and ssao pass
+  m_ssaoPass.setCameraProperties(m_cam.getProjectionMatrix().getInverse(), m_cam.getFarClip());
+
+  bindGBufferTextures(); // bind them once to upper texture units - faster than binding/unbinding every frame
+}
+
+void testApp::setupFinalRenderFbo() {
+  // delete old texture, fbo, and render buffer
+  glDeleteTextures(1, &m_renderTex);
+  glDeleteRenderbuffers(1, &m_finalRenderRbo);
+  glDeleteFramebuffers(1, &m_fbo);
   
   // setup fbo
   glGenTextures(1, &m_renderTex);
@@ -60,31 +93,28 @@ void testApp::setup() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_windowWidth, m_windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
   
-  GLuint rbo;
-  glGenRenderbuffers(1, &rbo);
-  glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+
+  glGenRenderbuffers(1, &m_finalRenderRbo);
+  glBindRenderbuffer(GL_RENDERBUFFER, m_finalRenderRbo);
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, m_windowWidth, m_windowHeight);
   
   // create an fbo
   glGenFramebuffers(1, &m_fbo);
   glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_renderTex, 0);  
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_renderTex, 0);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_finalRenderRbo);
+  
   // check status
   GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   
   if (status != GL_FRAMEBUFFER_COMPLETE) {
     cout << "ssaoPass::setup() - error could not create framebuffer" << endl;
+    return false;
   }
   
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glBindRenderbuffer(GL_RENDERBUFFER, 0);
   glBindTexture(GL_TEXTURE_2D, 0);
-  
-  bindGBufferTextures(); // bind them once to upper texture units - faster than binding/unbinding every frame
-
-//  generateViewRayTexture();
 }
 
 void testApp::setupScreenQuad() {
@@ -241,6 +271,7 @@ void testApp::geometryPass() {
 void testApp::pointLightPass() {
   
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo);
+  glViewport(0, 0, m_windowWidth, m_windowHeight);
   
   glDisable(GL_CULL_FACE); // need to do this to draw planes in OF because of vertex ordering
 
@@ -248,12 +279,15 @@ void testApp::pointLightPass() {
   glEnable(GL_BLEND);
   glBlendEquation(GL_FUNC_ADD);
   glBlendFunc(GL_ONE, GL_ONE);
-  
-  ofSetSphereResolution(8.0f);
-  
+    
   glClear(GL_COLOR_BUFFER_BIT);
 
   m_cam.begin();
+  
+  // this pass draws the spheres representing the area of influence each light has
+  // in a fragment shader, only the pixels that are affected by the drawn geometry are processed
+  // drawing light volumes (spheres for point lights) ensures that we're only running light calculations on
+  // the areas that the spheres affect
   
   m_pointLightPassShader.begin();
 
@@ -393,6 +427,8 @@ void testApp::keyPressed(int key){
     m_bPulseLights = !m_bPulseLights;
   } else if (key == 'r') {
     randomizeLightColors();
+  } else if (key == 'f') {
+    ofToggleFullscreen();
   }
 }
 
@@ -421,7 +457,7 @@ void testApp::mouseReleased(int x, int y, int button){
 
 //--------------------------------------------------------------
 void testApp::windowResized(int w, int h){
-
+  resizeBuffersAndTextures();
 }
 
 //--------------------------------------------------------------

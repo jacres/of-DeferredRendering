@@ -19,13 +19,11 @@ GBuffer::~GBuffer() {
   
 }
 
-bool GBuffer::setup(unsigned int windowWidth, unsigned windowHeight) {
-  m_buffer_w = windowWidth;
-  m_buffer_h = windowHeight;
-  
+bool GBuffer::setup(unsigned int windowWidth, unsigned int windowHeight) {
+
   loadShaders();
   
-  bool success = setupFbo();
+  bool success = setupFbo(windowWidth, windowHeight);
   
   // return success
   return true;
@@ -35,7 +33,16 @@ void GBuffer::loadShaders() {
   m_gBufferShader.load("shaders/gbuffer.vert", "shaders/gbuffer.frag");
 }
 
-bool GBuffer::setupFbo() {
+bool GBuffer::setupFbo(unsigned int windowWidth, unsigned int windowHeight) {
+  
+  m_buffer_w = windowWidth;
+  m_buffer_h = windowHeight;
+  
+  // delete existing fbo, textures, and render buffer in case we are regenerating at new size
+  glDeleteTextures(GBUFFER_NUM_TEXTURES, m_textures);
+  glDeleteRenderbuffers(1, &m_renderBuffer);
+  glDeleteFramebuffers(1, &m_fbo);
+  
   // create an fbo
   glGenFramebuffers(1, &m_fbo);
   glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
@@ -63,11 +70,10 @@ bool GBuffer::setupFbo() {
   
   // create depth texture (we don't use this explicitly, but since we use depth testing when rendering, our FBO needs a depth buffer)
   // we make it a renderbuffer and not a texture as we'll never access it
-  GLuint rbo;
-  glGenRenderbuffers(1, &rbo);
-  glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+  glGenRenderbuffers(1, &m_renderBuffer);
+  glBindRenderbuffer(GL_RENDERBUFFER, m_renderBuffer);
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, m_buffer_w, m_buffer_h);
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_renderBuffer);
   
   // specify draw buffers for render targets
   for (unsigned int i=0; i<GBUFFER_NUM_TEXTURES; i++) {
@@ -84,7 +90,7 @@ bool GBuffer::setupFbo() {
   glBindTexture(GL_TEXTURE_2D, 0);
 
   if (status != GL_FRAMEBUFFER_COMPLETE) {
-    ofLogError("GBuffer::init()", "Could not create framebuffer");
+    ofLogError("GBuffer::setupFbo()", "Could not create framebuffer");
     return false;
   }
   
@@ -97,6 +103,8 @@ GLuint GBuffer::getTexture(GBUFFER_TEXTURE_TYPE textureType) {
 
 void GBuffer::bindForWriting(float near, float far) {
   glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+  glViewport(0, 0, m_buffer_w, m_buffer_h);
+  
   glDrawBuffers(GBUFFER_NUM_TEXTURES, m_drawBuffers);
 
   glDepthMask(GL_TRUE);

@@ -34,7 +34,7 @@ class testApp : public ofBaseApp {
   
   static const int skNumLights = 100;
   static const int skRadius = 20;
-  static const int skMaxPointLightRadius = 10;
+  static const int skMaxPointLightRadius = 8;
 
   enum TEXTURE_UNITS {
     TEX_UNIT_ALBEDO,
@@ -64,6 +64,8 @@ public:
   void setupModel();
   void setupLights();
   void setupScreenQuad();
+  void setupFinalRenderFbo();
+  void resizeBuffersAndTextures();
   
   void addRandomLight();
   void createRandomBoxes();
@@ -93,14 +95,15 @@ public:
   GLuint m_textureUnits[TEX_UNIT_NUM_UNITS];
   GLuint m_fbo;
   GLuint m_renderTex;
+  GLuint m_finalRenderRbo;
   
   float   m_angle;    
   
   bool    m_bDrawDebug;
   bool    m_bPulseLights;
   
-  float m_windowWidth;
-  float m_windowHeight;
+  int     m_windowWidth;
+  int     m_windowHeight;
   
   vector<Box> m_boxes;
   vector<PointLight> m_lights;
