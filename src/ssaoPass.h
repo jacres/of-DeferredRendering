@@ -11,6 +11,8 @@ public:
   ~SSAOPass();
 
   bool setup(int w, int h, int numSamples=12);
+  bool setupFbo(int w, int h);
+  void setParameters(float occluderBias, float samplingRadius, float constantAttenuation, float linearAttenuation);
   void setCameraProperties(const ofMatrix4x4& invProjMatrix, float farDistance);
   void applySSAO(GLuint normalsAndDepthTexUnit);
   void drawDebug(int x, int y);
@@ -22,6 +24,8 @@ private:
   static const ofVec2f  s_quadTexCoords[];
   static ofVbo          s_quadVbo;
 
+  bool  m_bIsSetup;
+  
   int   m_fbo_w;
   int   m_fbo_h;
   float m_texel_w;

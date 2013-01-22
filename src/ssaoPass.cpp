@@ -27,7 +27,8 @@ const ofVec2f SSAOPass::s_quadTexCoords[] = {
 SSAOPass::SSAOPass() :
   m_fbo_w(1024),
   m_fbo_h(1024),
-  m_numSamples(12)
+  m_numSamples(12),
+  m_bIsSetup(false)
 {
 }
 
@@ -35,28 +36,52 @@ SSAOPass::~SSAOPass() {
 }
 
 bool SSAOPass::setup(int w, int h, int numSamples) {
+    
+  if (!m_bIsSetup) {
+    m_numSamples = numSamples;
+    
+    // full viewport quad vbo
+    s_quadVbo.setVertexData(&s_quadVerts[0], 4, GL_STATIC_DRAW);
+    s_quadVbo.setTexCoordData(&s_quadTexCoords[0], 4, GL_STATIC_DRAW);
+    
+    m_ssaoShader.load("shaders/ssao.vert", "shaders/ssao.frag");
+
+    // load random normals texture for SSAO
+    m_randomTexture.loadImage("textures/random.png");
+    
+    m_ssaoShader.begin();
+    m_ssaoShader.setUniform1i("u_randomJitterTex", 10);
+    m_ssaoShader.end();
+    
+    setParameters(0.5f, 30.0f, 0.3f, 0.36f);
+  
+    m_bIsSetup = true;
+  }
+  
+  if (!setupFbo(w, h)) {
+    return false;
+  }
+  
+  return true;
+}
+
+bool SSAOPass::setupFbo(int w, int h) {
   m_fbo_w = w;
   m_fbo_h = h;
   
   m_texel_w = 1.0f/(float)m_fbo_w;
   m_texel_h = 1.0f/(float)m_fbo_h;
   
-  m_numSamples = numSamples;
-  
-  // full viewport quad vbo
-  s_quadVbo.setVertexData(&s_quadVerts[0], 4, GL_STATIC_DRAW);
-  s_quadVbo.setTexCoordData(&s_quadTexCoords[0], 4, GL_STATIC_DRAW);
-  
-  m_ssaoShader.load("shaders/ssao.vert", "shaders/ssao.frag");
-
-  // load random normals texture for SSAO
-  m_randomTexture.loadImage("textures/random.png");
-
   // setup fbo
+  
+  // delete existing fbo + textures in case we are regenerating them to new size
+  glDeleteTextures(1, &m_ssaoTex);
+  glDeleteFramebuffers(1, &m_fbo);
+  
   // create all gbuffer textures
   glGenTextures(1, &m_ssaoTex);
   
-  // 8-bit RGB texture for SSAO
+  // 16-bit RGB texture for SSAO
   glBindTexture(GL_TEXTURE_2D, m_ssaoTex);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -68,17 +93,21 @@ bool SSAOPass::setup(int w, int h, int numSamples) {
   glGenFramebuffers(1, &m_fbo);
   glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_ssaoTex, 0);
-
+  
   // check status
   GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   
   if (status != GL_FRAMEBUFFER_COMPLETE) {
-    cout << "ssaoPass::setup() - error could not create framebuffer" << endl;
+    ofLogError("SSAOPass::setupFbo()", "Could not create framebuffer");
     return false;
   }
   
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glBindTexture(GL_TEXTURE_2D, 0);
+    
+  m_ssaoShader.begin();
+  m_ssaoShader.setUniform2f("u_texelSize", m_texel_w, m_texel_h);
+  m_ssaoShader.end();
   
   return true;
 }
@@ -87,29 +116,29 @@ GLuint SSAOPass::getTextureReference() {
   return m_ssaoTex;
 }
 
+void SSAOPass::setParameters(float occluderBias, float samplingRadius, float constantAttenuation, float linearAttenuation) {
+  m_ssaoShader.begin();
+  m_ssaoShader.setUniform1f("u_occluderBias", occluderBias);
+  m_ssaoShader.setUniform1f("u_samplingRadius", samplingRadius);
+  m_ssaoShader.setUniform2f("u_attenuation", constantAttenuation, linearAttenuation);
+  m_ssaoShader.end();
+}
+
 void SSAOPass::setCameraProperties(const ofMatrix4x4& invProjMatrix, float farDistance) {
   m_ssaoShader.begin();
   m_ssaoShader.setUniformMatrix4f("u_inverseProjMatrix", invProjMatrix.getPtr());
   m_ssaoShader.setUniform1f("u_farDistance", farDistance);
-  
-  m_ssaoShader.setUniform1i("u_randomJitterTex", 10);
-  
-  m_ssaoShader.setUniform2f("u_texelSize", m_texel_w, m_texel_h);
-  
-  m_ssaoShader.setUniform1f("u_occluderBias", 0.5f);
-  m_ssaoShader.setUniform1f("u_samplingRadius", 10.0f);
-  m_ssaoShader.setUniform2f("u_attenuation", 0.3f, 0.36f);
-
-  
   m_ssaoShader.end();
 }
 
 void SSAOPass::applySSAO(GLuint normalsAndDepthTexUnit) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo);
+  glViewport(0, 0, m_fbo_w, m_fbo_h);
+  
   GLuint drawBuffers[] = {GL_COLOR_ATTACHMENT0};
   glDrawBuffers(1, drawBuffers);
   
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glClear(GL_COLOR_BUFFER_BIT);
   
   glDisable(GL_BLEND);
   
